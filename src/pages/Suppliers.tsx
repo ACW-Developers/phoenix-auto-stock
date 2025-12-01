@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Truck, Search, Mail, Phone, MapPin } from "lucide-react";
+import { Truck, Search, Mail, Phone, MapPin, Plus, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { SupplierDialog } from "@/components/SupplierDialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 interface Supplier {
   id: string;
@@ -16,6 +18,7 @@ interface Supplier {
   address: string | null;
   city: string | null;
   state: string | null;
+  zip_code: string | null;
   notes: string | null;
 }
 
@@ -23,6 +26,10 @@ const Suppliers = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | undefined>();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [supplierToDelete, setSupplierToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     loadSuppliers();
@@ -45,6 +52,31 @@ const Suppliers = () => {
     }
   };
 
+  const handleEdit = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!supplierToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("suppliers")
+        .delete()
+        .eq("id", supplierToDelete);
+
+      if (error) throw error;
+      toast.success("Supplier deleted successfully");
+      loadSuppliers();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete supplier");
+    } finally {
+      setDeleteDialogOpen(false);
+      setSupplierToDelete(null);
+    }
+  };
+
   const filteredSuppliers = suppliers.filter(
     (supplier) =>
       supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -59,6 +91,10 @@ const Suppliers = () => {
             <h2 className="text-3xl font-heading font-bold tracking-tight">Suppliers</h2>
             <p className="text-muted-foreground">Manage your supplier network</p>
           </div>
+          <Button onClick={() => { setSelectedSupplier(undefined); setDialogOpen(true); }}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Supplier
+          </Button>
         </div>
 
         <Card>
@@ -153,6 +189,28 @@ const Suppliers = () => {
                             </p>
                           </div>
                         )}
+
+                        <div className="flex gap-2 pt-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => handleEdit(supplier)}
+                          >
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSupplierToDelete(supplier.id);
+                              setDeleteDialogOpen(true);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -162,6 +220,30 @@ const Suppliers = () => {
           </CardContent>
         </Card>
       </div>
+
+      <SupplierDialog
+        open={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        supplier={selectedSupplier}
+        onSuccess={loadSuppliers}
+      />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Supplier</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure? This will permanently delete this supplier.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };

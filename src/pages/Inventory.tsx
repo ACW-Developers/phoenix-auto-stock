@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Package, AlertCircle } from "lucide-react";
+import { Search, Package, Edit } from "lucide-react";
 import { toast } from "sonner";
+import { InventoryAdjustDialog } from "@/components/InventoryAdjustDialog";
 
 interface InventoryItem {
   id: string;
@@ -28,6 +29,8 @@ const Inventory = () => {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [adjustDialogOpen, setAdjustDialogOpen] = useState(false);
+  const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(null);
 
   useEffect(() => {
     loadInventory();
@@ -65,6 +68,11 @@ const Inventory = () => {
       return { label: "Adequate", variant: "secondary" as const, color: "text-primary" };
     }
     return { label: "Good", variant: "default" as const, color: "text-success" };
+  };
+
+  const handleAdjust = (item: InventoryItem) => {
+    setSelectedInventory(item);
+    setAdjustDialogOpen(true);
   };
 
   const filteredInventory = inventory.filter((item) =>
@@ -154,6 +162,14 @@ const Inventory = () => {
                               </div>
                               <div className="text-xs text-muted-foreground">per unit</div>
                             </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleAdjust(item)}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Adjust
+                            </Button>
                           </div>
                         </div>
                       </CardContent>
@@ -165,6 +181,18 @@ const Inventory = () => {
           </CardContent>
         </Card>
       </div>
+
+      {selectedInventory && (
+        <InventoryAdjustDialog
+          open={adjustDialogOpen}
+          onClose={() => setAdjustDialogOpen(false)}
+          inventoryId={selectedInventory.id}
+          currentQuantity={selectedInventory.quantity}
+          currentReorderLevel={selectedInventory.reorder_level}
+          productName={selectedInventory.products.name}
+          onSuccess={loadInventory}
+        />
+      )}
     </DashboardLayout>
   );
 };
