@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, ShoppingCart, Truck, AlertTriangle, User, LogOut } from "lucide-react";
+import { LayoutDashboard, Package, ShoppingCart, Truck, AlertTriangle, User, LogOut, Box, Tag } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,6 +19,8 @@ import {
 const menuItems = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Inventory", url: "/inventory", icon: Package },
+  { title: "Products", url: "/products", icon: Box },
+  { title: "Categories", url: "/categories", icon: Tag },
   { title: "POS", url: "/pos", icon: ShoppingCart },
   { title: "Suppliers", url: "/suppliers", icon: Truck },
   { title: "Alerts", url: "/alerts", icon: AlertTriangle },
