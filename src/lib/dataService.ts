@@ -446,3 +446,50 @@ export const fetchDashboardStats = async () => {
     totalRevenue: todaySales.reduce((sum: number, sale: any) => sum + Number(sale.total_amount), 0),
   };
 };
+
+// Consolidated data service object for easier imports
+export const dataService = {
+  // Categories
+  getCategories: fetchCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  
+  // Suppliers
+  getSuppliers: fetchSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+  
+  // Products
+  getProducts: fetchProducts,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  
+  // Shops
+  getShops: fetchShops,
+  
+  // Inventory
+  getInventory: fetchInventory,
+  updateInventory,
+  
+  // Alerts
+  getAlerts: fetchAlerts,
+  acknowledgeAlert,
+  
+  // Sales
+  getSales: fetchSales,
+  createSale,
+  
+  // Reorder Requests
+  getReorderRequests: fetchReorderRequests,
+  createReorderRequest,
+  updateReorderRequest,
+  
+  // Dashboard
+  getDashboardStats: fetchDashboardStats,
+  
+  // Initialization
+  initializeSampleData,
+};
