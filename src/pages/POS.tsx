@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,8 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { ShoppingCart, Trash2, Plus } from "lucide-react";
+import { PageLoader, LoadingSpinner } from "@/components/LoadingSpinner";
+import { ShoppingCart, Trash2, Plus, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { fetchProducts, fetchShops, createSale, initializeSampleData } from "@/lib/dataService";
 
 interface Product {
   id: string;
@@ -35,21 +36,31 @@ const POS = () => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [processing, setProcessing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saleComplete, setSaleComplete] = useState(false);
 
   useEffect(() => {
-    loadShops();
-    loadProducts();
+    initializeSampleData();
+    loadData();
   }, []);
 
-  const loadShops = async () => {
-    const { data } = await supabase.from("shops").select("id, name");
-    if (data) setShops(data);
-  };
-
-  const loadProducts = async () => {
-    const { data } = await supabase.from("products").select("id, name, sku, unit_price");
-    if (data) setProducts(data);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [shopsData, productsData] = await Promise.all([
+        fetchShops(),
+        fetchProducts(),
+      ]);
+      setShops(shopsData as Shop[]);
+      setProducts(productsData as Product[]);
+      if (shopsData.length > 0) {
+        setSelectedShop((shopsData as Shop[])[0].id);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const addToCart = () => {
@@ -74,6 +85,7 @@ const POS = () => {
             : item
         )
       );
+      toast.success(`Added another ${product.name}`);
     } else {
       setCart([
         ...cart,
@@ -83,6 +95,7 @@ const POS = () => {
           subtotal: Number(product.unit_price),
         },
       ]);
+      toast.success(`${product.name} added to cart`);
     }
     setSelectedProduct("");
   };
@@ -106,7 +119,11 @@ const POS = () => {
   };
 
   const removeFromCart = (productId: string) => {
+    const item = cart.find((i) => i.id === productId);
     setCart(cart.filter((item) => item.id !== productId));
+    if (item) {
+      toast.info(`${item.name} removed from cart`);
+    }
   };
 
   const getTotalAmount = () => {
@@ -125,50 +142,61 @@ const POS = () => {
 
     setProcessing(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
+      const saleData = {
+        shop_id: selectedShop,
+        user_id: "demo-user",
+        total_amount: getTotalAmount(),
+        customer_name: customerName || null,
+        customer_phone: customerPhone || null,
+        payment_method: paymentMethod,
+      };
 
-      // Create sale
-      const { data: sale, error: saleError } = await supabase
-        .from("sales")
-        .insert({
-          shop_id: selectedShop,
-          user_id: user.id,
-          total_amount: getTotalAmount(),
-          customer_name: customerName || null,
-          customer_phone: customerPhone || null,
-        })
-        .select()
-        .single();
-
-      if (saleError) throw saleError;
-
-      // Create sale items
-      const saleItems = cart.map((item) => ({
-        sale_id: sale.id,
+      const items = cart.map((item) => ({
         product_id: item.id,
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal,
       }));
 
-      const { error: itemsError } = await supabase.from("sale_items").insert(saleItems);
-
-      if (itemsError) throw itemsError;
-
-      toast.success("Sale completed successfully!");
+      await createSale(saleData, items);
       
-      // Reset form
-      setCart([]);
-      setCustomerName("");
-      setCustomerPhone("");
+      setSaleComplete(true);
+      setTimeout(() => {
+        setSaleComplete(false);
+        setCart([]);
+        setCustomerName("");
+        setCustomerPhone("");
+      }, 2000);
+      
+      toast.success("Sale completed successfully!");
     } catch (error: any) {
       toast.error(error.message || "Failed to process sale");
-      console.error(error);
     } finally {
       setProcessing(false);
     }
   };
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <PageLoader text="Loading POS system..." />
+      </DashboardLayout>
+    );
+  }
+
+  if (saleComplete) {
+    return (
+      <DashboardLayout>
+        <div className="flex flex-col items-center justify-center min-h-[500px] animate-in">
+          <div className="p-6 rounded-full bg-success/10 mb-6">
+            <CheckCircle className="h-16 w-16 text-success" />
+          </div>
+          <h2 className="text-2xl font-heading font-bold text-success mb-2">Sale Complete!</h2>
+          <p className="text-muted-foreground">Transaction processed successfully</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -225,9 +253,10 @@ const POS = () => {
               <div className="space-y-3">
                 <h3 className="font-semibold">Cart Items</h3>
                 {cart.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
+                  <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-lg">
                     <ShoppingCart className="mx-auto h-12 w-12 mb-2 opacity-50" />
                     <p>Cart is empty</p>
+                    <p className="text-sm">Select products above to add them</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -300,6 +329,19 @@ const POS = () => {
                     placeholder="(555) 123-4567"
                   />
                 </div>
+                <div className="space-y-2">
+                  <Label>Payment Method</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="check">Check</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </CardContent>
             </Card>
 
@@ -324,7 +366,14 @@ const POS = () => {
                   onClick={processSale}
                   disabled={processing || cart.length === 0}
                 >
-                  {processing ? "Processing..." : "Complete Sale"}
+                  {processing ? (
+                    <>
+                      <LoadingSpinner size="sm" className="mr-2" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Complete Sale"
+                  )}
                 </Button>
               </CardContent>
             </Card>

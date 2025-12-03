@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Package, Edit } from "lucide-react";
+import { Search, Package, Edit, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/LoadingSpinner";
 import { InventoryAdjustDialog } from "@/components/InventoryAdjustDialog";
+import { fetchInventory, initializeSampleData } from "@/lib/dataService";
 
 interface InventoryItem {
   id: string;
@@ -33,25 +34,15 @@ const Inventory = () => {
   const [selectedInventory, setSelectedInventory] = useState<InventoryItem | null>(null);
 
   useEffect(() => {
+    initializeSampleData();
     loadInventory();
   }, []);
 
   const loadInventory = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("inventory")
-        .select(`
-          *,
-          products (name, sku, brand, unit_price),
-          shops (name)
-        `)
-        .order("quantity", { ascending: true });
-
-      if (error) throw error;
-      setInventory(data || []);
-    } catch (error: any) {
-      toast.error("Failed to load inventory");
-      console.error(error);
+      const data = await fetchInventory();
+      setInventory(data as InventoryItem[]);
     } finally {
       setLoading(false);
     }
@@ -76,10 +67,12 @@ const Inventory = () => {
   };
 
   const filteredInventory = inventory.filter((item) =>
-    item.products.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.products.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.products.brand?.toLowerCase().includes(searchTerm.toLowerCase())
+    item.products?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.products?.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.products?.brand?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const lowStockCount = inventory.filter((item) => item.quantity <= item.reorder_level).length;
 
   return (
     <DashboardLayout>
@@ -91,6 +84,12 @@ const Inventory = () => {
               Manage your stock levels across all locations
             </p>
           </div>
+          {lowStockCount > 0 && (
+            <Badge variant="destructive" className="text-sm py-1 px-3">
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              {lowStockCount} items need attention
+            </Badge>
+          )}
         </div>
 
         <Card>
@@ -109,11 +108,7 @@ const Inventory = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-20 bg-muted rounded animate-pulse"></div>
-                ))}
-              </div>
+              <PageLoader text="Loading inventory..." />
             ) : filteredInventory.length === 0 ? (
               <div className="text-center py-12">
                 <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
@@ -131,15 +126,15 @@ const Inventory = () => {
                         <div className="flex items-center justify-between">
                           <div className="flex-1 space-y-1">
                             <div className="flex items-center gap-3">
-                              <h3 className="font-semibold">{item.products.name}</h3>
+                              <h3 className="font-semibold">{item.products?.name}</h3>
                               <Badge variant="outline" className="text-xs">
-                                {item.products.sku}
+                                {item.products?.sku}
                               </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                              <span>Brand: {item.products.brand || "N/A"}</span>
+                              <span>Brand: {item.products?.brand || "N/A"}</span>
                               <span>•</span>
-                              <span>Shop: {item.shops.name}</span>
+                              <span>Shop: {item.shops?.name}</span>
                               <span>•</span>
                               <span>Location: {item.location || "Not set"}</span>
                             </div>
@@ -153,12 +148,12 @@ const Inventory = () => {
                                 Reorder at: {item.reorder_level}
                               </div>
                             </div>
-                            <Badge variant={status.variant} className="min-w-[100px] justify-center">
+                            <Badge variant={status.variant} className={`min-w-[100px] justify-center ${status.label === "Low" ? "bg-warning text-warning-foreground" : ""}`}>
                               {status.label}
                             </Badge>
                             <div className="text-right min-w-[80px]">
                               <div className="text-lg font-semibold">
-                                ${Number(item.products.unit_price).toFixed(2)}
+                                ${Number(item.products?.unit_price || 0).toFixed(2)}
                               </div>
                               <div className="text-xs text-muted-foreground">per unit</div>
                             </div>
@@ -189,7 +184,7 @@ const Inventory = () => {
           inventoryId={selectedInventory.id}
           currentQuantity={selectedInventory.quantity}
           currentReorderLevel={selectedInventory.reorder_level}
-          productName={selectedInventory.products.name}
+          productName={selectedInventory.products?.name || "Unknown"}
           onSuccess={loadInventory}
         />
       )}

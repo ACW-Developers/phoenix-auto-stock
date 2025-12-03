@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Package, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ProductDialog } from "@/components/ProductDialog";
+import { PageLoader } from "@/components/LoadingSpinner";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { fetchProducts, deleteProduct, initializeSampleData } from "@/lib/dataService";
 
 interface Product {
   id: string;
@@ -35,25 +36,15 @@ const Products = () => {
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
 
   useEffect(() => {
+    initializeSampleData();
     loadProducts();
   }, []);
 
   const loadProducts = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`
-          *,
-          categories (name),
-          suppliers (name)
-        `)
-        .order("name");
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error: any) {
-      toast.error("Failed to load products");
-      console.error(error);
+      const data = await fetchProducts();
+      setProducts(data as Product[]);
     } finally {
       setLoading(false);
     }
@@ -68,12 +59,7 @@ const Products = () => {
     if (!productToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", productToDelete);
-
-      if (error) throw error;
+      await deleteProduct(productToDelete);
       toast.success("Product deleted successfully");
       loadProducts();
     } catch (error: any) {
@@ -97,7 +83,7 @@ const Products = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-heading font-bold tracking-tight">Products</h2>
-            <p className="text-muted-foreground">Manage your product catalog</p>
+            <p className="text-muted-foreground">Manage your auto parts catalog</p>
           </div>
           <Button onClick={() => { setSelectedProduct(undefined); setDialogOpen(true); }}>
             <Plus className="h-4 w-4 mr-2" />
@@ -119,11 +105,7 @@ const Products = () => {
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="space-y-3">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-24 bg-muted rounded animate-pulse"></div>
-                ))}
-              </div>
+              <PageLoader text="Loading products..." />
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-12">
                 <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />

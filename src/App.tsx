@@ -12,6 +12,8 @@ import Alerts from "./pages/Alerts";
 import Profile from "./pages/Profile";
 import Products from "./pages/Products";
 import Categories from "./pages/Categories";
+import Reorders from "./pages/Reorders";
+import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,11 +30,13 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/pos" element={<POS />} />
-        <Route path="/suppliers" element={<Suppliers />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/categories" element={<Categories />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/profile" element={<Profile />} />
+          <Route path="/suppliers" element={<Suppliers />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/categories" element={<Categories />} />
+          <Route path="/reorders" element={<Reorders />} />
+          <Route path="/sales" element={<Sales />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
