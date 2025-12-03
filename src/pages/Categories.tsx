@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import DashboardLayout from "@/components/DashboardLayout";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Plus, Tag, Edit, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { PageLoader } from "@/components/LoadingSpinner";
+import { fetchCategories, createCategory, updateCategory, deleteCategory, initializeSampleData } from "@/lib/dataService";
 
 interface Category {
   id: string;
@@ -28,20 +29,15 @@ const Categories = () => {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    initializeSampleData();
     loadCategories();
   }, []);
 
   const loadCategories = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("categories")
-        .select("*")
-        .order("name");
-
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error: any) {
-      toast.error("Failed to load categories");
+      const data = await fetchCategories();
+      setCategories(data as Category[]);
     } finally {
       setLoading(false);
     }
@@ -65,22 +61,12 @@ const Categories = () => {
 
     try {
       if (selectedCategory) {
-        const { error } = await supabase
-          .from("categories")
-          .update(formData)
-          .eq("id", selectedCategory.id);
-
-        if (error) throw error;
+        await updateCategory(selectedCategory.id, formData);
         toast.success("Category updated successfully");
       } else {
-        const { error } = await supabase
-          .from("categories")
-          .insert([formData]);
-
-        if (error) throw error;
+        await createCategory(formData);
         toast.success("Category created successfully");
       }
-
       loadCategories();
       setDialogOpen(false);
     } catch (error: any) {
@@ -94,12 +80,7 @@ const Categories = () => {
     if (!categoryToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from("categories")
-        .delete()
-        .eq("id", categoryToDelete);
-
-      if (error) throw error;
+      await deleteCategory(categoryToDelete);
       toast.success("Category deleted successfully");
       loadCategories();
     } catch (error: any) {
@@ -116,7 +97,7 @@ const Categories = () => {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-heading font-bold tracking-tight">Categories</h2>
-            <p className="text-muted-foreground">Organize your products by categories</p>
+            <p className="text-muted-foreground">Organize your auto parts by categories</p>
           </div>
           <Button onClick={handleAdd}>
             <Plus className="h-4 w-4 mr-2" />
@@ -127,11 +108,7 @@ const Categories = () => {
         <Card>
           <CardContent className="pt-6">
             {loading ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="h-32 bg-muted rounded animate-pulse"></div>
-                ))}
-              </div>
+              <PageLoader text="Loading categories..." />
             ) : categories.length === 0 ? (
               <div className="text-center py-12">
                 <Tag className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
